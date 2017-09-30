@@ -19,7 +19,6 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
-int64_t waitTicks = 0;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -31,6 +30,8 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+static struct list waiting;
+
 struct semaphore sema;
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
@@ -40,6 +41,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&waiting);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -92,19 +94,21 @@ int64_t timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  printf("\n\ntimer sleep called on %d\n\n\n",ticks);
   //Sabrina is driving here 
-  startTime = timer_ticks ();
-  waitTicks = ticks;
-
+  printf("timer_sleep called on %d\n",ticks);
   ASSERT (intr_get_level () == INTR_ON);
 
+  struct thread *t = thread_current(); //get current thread
+  
+  t->wake_ticks = timer_ticks() + ticks; //get wakeup time
+
+  //disable interrupts to access list (atomic)
+  intr_disable();
+  list_push_back(&waiting, &t->waiting_list_elem);   
+  intr_enable();
 
   sema_init(&sema, 0);
   sema_down(&sema); //call sema down, blocks thread
-
-  //struct lock lock;
-  //struct condition time_finished;
 
 }
 
@@ -182,16 +186,22 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  printf("timer interrupt: %d\n", ticks);
+  
   ticks++; //increments global ticks
-  if(waitTicks != 0){ //if timer_asleep has been called
-    printf("entered first loop: %d\n", waitTicks);
-    if(timer_elapsed(startTime) >= waitTicks){ //if enough time has elapsed
-      sema_up(&sema); //unblock
-      waitTicks = 0; //reset waitTicks
-     }
+  thread_tick(); 
+ 
+  //Laura is driving here
+  if(!list_empty(&waiting)){ //if list is not empty
+    printf("list is not empty\n");    
+    struct thread *t = list_front(&waiting); 
+    
+    if(ticks >= &t->wake_ticks){ //if it is time for the thread to wake
+      printf("thread wake up: %d\n",&t->wake_ticks);
+      sema_up(&sema); //unblock thread
+      list_pop_front(&waiting); //remove from waiting list
+     
+    }
   }
-  thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

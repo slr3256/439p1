@@ -102,6 +102,11 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    //Laura is driving here
+    //pointer to element in waiting list
+    struct list_elem waiting_list_elem;
+    int64_t wake_ticks;
   };
 
 /* If false (default), use round-robin scheduler.
