@@ -5,6 +5,9 @@
 #include <list.h>
 #include <stdint.h>
 
+//added
+#include <threads/synch.h>
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -95,6 +98,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -107,6 +111,7 @@ struct thread
     //pointer to element in waiting list
     struct list_elem waiting_list_elem;
     int64_t wake_ticks;
+    struct semaphore waiting_sema;
   };
 
 /* If false (default), use round-robin scheduler.
